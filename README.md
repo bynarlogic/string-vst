@@ -1,8 +1,9 @@
-# RNBO JUCE Examples
+# STRING VST
 
-So you want to build your own DAW or a Plugin? This template should get you started with your own Standalone Desktop application and Audio Plugin, using the source code export feature of RNBO, part of [Max 8](https://cycling74.com/max8/) made by [Cycling '74](https://cycling74.com/). 
+This plugin will explore various ideas relating to controlling the physical properties of a "string" as a synth parameter. The goal is to eventually model fantastical sounding strings such as suspension bridge cables playing within a resonantor that produces some audible frequency.   
 
-This project is based on the cross-platform JUCE framework for handling audio processing. You have the option of using JUCE to manage your UI as well. Please be aware that the JUCE has its own license terms (mostly GPL with the availability of commercial licenses). See their [website](http://www.juce.com/) for further details.
+To start out, this instrument is based off of a max patch using waveguide synthesis to simulate the properties of a traveling wave as documented here: https://ccrma.stanford.edu/~jos/pasp/Digital_Waveguide_Models.html. The patch is mostly a copy of the patch demonstrated in this video: https://www.youtube.com/watch?v=Cc1-Rq0nSVo. 
+
 
 ## Prerequisites
 
@@ -31,23 +32,6 @@ Some notable files/directories:
 ## Using this Template
 
 This Github repo is a template, which means you can use it to start your own git-based project using this repository as a starting point. The major difference between a template and a fork is that your new project won't include the commit history of this template--it will be an entirely new starting point. For more see [the official description](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template).
-
-### Getting Started
-
-To get started, first create a new repository to hold your project using this repository as a template. If you're viewing this repo on Github, you should see a button at the top of the page that says `Use this template`. 
-
-![Use this template button](./img/use-this-template-button.png)
-
-You can also follow [the official steps](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template) on Github for creating a new repository from a template.
-
-Now you need to copy this repository locally. Follow [the official steps](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) to clone your repository. Once you've cloned your repository locally, you'll need to initialize the JUCE submodule.
-
-```
-cd your-project-folder
-git submodule update --init --recursive --progress
-```
-
-If the above command doesn't work, check your version if git by runing `git --version`. The `--progress` flag wasn't introduced until git `2.11.0`, so if your version is earlier than this you won't have access to it. Strictly speaking you don't need that last `--progress` flag, but it's nice to have some progress indication, especially since installing the JUCE submodule can take a while. That's all you'll need to do to get set up! Now you can start exporting from RNBO and building your project.
 
 ### Working with RNBO and Building Your Project
 
@@ -130,13 +114,3 @@ Hopefully, this will resolve the issue.
 ### MIDI CC and VST3
 VST3 introduced some changes to the way plugins handle MIDI data. One way to make newer VST3 plugins behave more like VST2 is to create Parameters for each MIDI CC value on each MIDI channel. You can dip your toes into the [full discussion](https://forums.steinberg.net/t/vst3-and-midi-cc-pitfall/201879/11) if you want, but we disable this behavior by default. If you really want it, you can enable it by commenting out the appropriate line in `CMakeLists.txt`.
 
-### Working with your Unity Plugin
-You may have noticed that `Plugin.cmake` is currently set up to build you a Unity plugin. If you'd like more a little information on using that Plugin in Unity, check out our [starter guide](UNITY.md).
-
-## Customizing the Project
-
-This project is based on the [JUCE Framework](http://www.juce.com/). Please refer to tutorials from JUCE on building UIs, for instance.
-
-There are details that you might want to change in `App.cmake` for Applications and in `Plugin.cmake` for Plugins.
-
-If you're not interested in the Application or Plugin parts of this project you can remove the associated *include* lines from the `CMakeLists.txt` file.

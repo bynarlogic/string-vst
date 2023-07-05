@@ -13,8 +13,8 @@ juce_add_gui_app(RNBOApp
   # ICON_BIG ...                      # ICON_* arguments specify a path to an image file to use as an icon
   # ICON_SMALL ...
   # DOCUMENT_EXTENSIONS ...           # Specify file extensions that should be associated with this app
-  COMPANY_NAME "cycling74"            # Specify the name of the app's author
-  PRODUCT_NAME "RNBO App Example")    # The name of the final executable, which can differ from the target name
+  COMPANY_NAME "RefactoredNoise"            # Specify the name of the app's author
+  PRODUCT_NAME "STRING Instrument")    # The name of the final executable, which can differ from the target name
 
 # `juce_generate_juce_header` will create a JuceHeader.h for a given target, which will be generated
 # into your build tree. This should be included with `#include <JuceHeader.h>`. The include path for
