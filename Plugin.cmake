@@ -54,6 +54,7 @@ target_sources(RNBOAudioPlugin PRIVATE
   src/Plugin.cpp
   src/CustomAudioEditor.cpp
   src/CustomAudioProcessor.cpp
+  ui/CustomUITutorial/Source/RootComponent.cpp
   )
 
 if (EXISTS ${RNBO_BINARY_DATA_FILE})
@@ -68,6 +69,7 @@ target_include_directories(RNBOAudioPlugin
   ${RNBO_CPP_DIR}/adapters/juce/
   ${RNBO_CPP_DIR}/src/3rdparty/
   src
+  ui/CustomUITutorial/Source
 )
 
 # `target_compile_definitions` adds some preprocessor definitions to our target. In a Projucer
