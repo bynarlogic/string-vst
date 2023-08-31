@@ -15,7 +15,7 @@ jobs:
     steps:
       - uses: actions/add-to-project@v0.3.0
         with:
-          project-url: https://github.com/orgs/Cycling74/projects/${{ secrets.PROJECT_NUMBER }}
+          project-url: https://github.com/users/bynarlogic/projects/${{ secrets.PROJECT_NUMBER }}
           github-token: ${{ secrets.ADD_TO_PROJECT_TOKEN }}
           labeled: bug
           label-operator: NOT
