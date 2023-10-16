@@ -3579,7 +3579,7 @@
 											}
 ,
 											"classnamespace" : "dsp.gen",
-											"rect" : [ 545.0, 267.0, 600.0, 582.0 ],
+											"rect" : [ 365.0, 183.0, 600.0, 582.0 ],
 											"bglocked" : 0,
 											"openinpresentation" : 0,
 											"default_fontsize" : 12.0,
@@ -3627,7 +3627,7 @@
 															}
 ,
 															"classnamespace" : "dsp.gen",
-															"rect" : [ 838.0, 187.0, 762.0, 654.0 ],
+															"rect" : [ 1067.0, 87.0, 759.0, 719.0 ],
 															"bglocked" : 0,
 															"openinpresentation" : 0,
 															"default_fontsize" : 12.0,
@@ -3744,7 +3744,7 @@
 																		"maxclass" : "comment",
 																		"text" : "https://thewolfsound.com/allpass-filter/",
 																		"linecount" : 2,
-																		"patching_rect" : [ 766.0, 183.0, 150.0, 33.0 ],
+																		"patching_rect" : [ 531.0, 165.0, 150.0, 33.0 ],
 																		"numoutlets" : 0,
 																		"id" : "obj-54",
 																		"numinlets" : 1
@@ -3756,7 +3756,7 @@
 																		"maxclass" : "comment",
 																		"text" : "HAP2​​(z)=1+d(1−c)z−1−cz−2−c+d(1−c)z−1+z−2​",
 																		"linecount" : 2,
-																		"patching_rect" : [ 766.0, 144.0, 150.0, 33.0 ],
+																		"patching_rect" : [ 531.0, 126.0, 150.0, 33.0 ],
 																		"numoutlets" : 0,
 																		"id" : "obj-53",
 																		"numinlets" : 1
@@ -5384,7 +5384,7 @@
 						"export_config" : 						{
 							"vst-au-export" : 							{
 								"vst-au-export-ins" : 								{
-									"plugin_manufacturer_name" : "Refactored Noise",
+									"plugin_manufacturer_name" : "Packard Audio",
 									"plugin_manufacturer_code" : "ST01",
 									"plugin_name" : "waveguide-string-plugin prototype"
 								}
@@ -5486,15 +5486,15 @@
 							}
 ,
 							"feedback" : 							{
-								"value" : 0.98
+								"value" : 0.999
 							}
 ,
 							"dampen" : 							{
-								"value" : 0.07
+								"value" : 0.02
 							}
 ,
 							"tuning" : 							{
-								"value" : 0.0
+								"value" : -1.0
 							}
 ,
 							"cutOff" : 							{
@@ -5502,7 +5502,7 @@
 							}
 ,
 							"dispersion" : 							{
-								"value" : 1.0
+								"value" : 0.998
 							}
 ,
 							"__presetid" : "waveguide-string"
@@ -5549,15 +5549,15 @@
 										}
 ,
 										"feedback" : 										{
-											"value" : 0.98
+											"value" : 0.999
 										}
 ,
 										"dampen" : 										{
-											"value" : 0.07
+											"value" : 0.02
 										}
 ,
 										"tuning" : 										{
-											"value" : 0.0
+											"value" : -1.0
 										}
 ,
 										"cutOff" : 										{
@@ -5565,7 +5565,7 @@
 										}
 ,
 										"dispersion" : 										{
-											"value" : 1.0
+											"value" : 0.998
 										}
 ,
 										"__presetid" : "waveguide-string"
