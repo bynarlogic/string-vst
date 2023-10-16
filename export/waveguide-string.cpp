@@ -62,7 +62,7 @@ Details of the GPLv3 license can be found at: https://www.gnu.org/licenses/gpl-3
 namespace RNBO {
 
 
-#define floor(x) ((long)(x))
+#define trunc(x) ((Int)(x))
 
 #if defined(__GNUC__) || defined(__clang__)
     #define RNBO_RESTRICT __restrict__
@@ -75,17 +75,17 @@ namespace RNBO {
 class rnbomatic : public PatcherInterfaceImpl {
 public:
 
-class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
+class RNBOSubpatcher_126 : public PatcherInterfaceImpl {
     
     friend class rnbomatic;
     
     public:
     
-    RNBOSubpatcher_12()
+    RNBOSubpatcher_126()
     {
     }
     
-    ~RNBOSubpatcher_12()
+    ~RNBOSubpatcher_126()
     {
     }
     
@@ -99,10 +99,20 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
     void cancelClockEvents()
     {
+        getEngine()->flushClockEvents(this, 861222235, false);
+        getEngine()->flushClockEvents(this, -1494586265, false);
     }
     
     inline number linearinterp(number frac, number x, number y) {
         return x + (y - x) * frac;
+    }
+    
+    SampleIndex currentsampletime() {
+        return this->audioProcessSampleCount + this->sampleOffsetIntoNextAudioBuffer;
+    }
+    
+    number mstosamps(MillisecondTime ms) {
+        return ms * this->sr * 0.001;
     }
     
     inline number cubicinterp(number a, number w, number x, number y, number z) {
@@ -150,10 +160,6 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         return x * (1.0 - a2) + y * a2;
     }
     
-    number mstosamps(MillisecondTime ms) {
-        return ms * this->sr * 0.001;
-    }
-    
     number samplerate() {
         return this->sr;
     }
@@ -196,7 +202,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         if (this->getIsMuted())
             return;
     
-        this->click_01_perform(this->signals[0], n);
+        this->curve_01_perform(this->signals[0], n);
     
         this->lores_01_perform(
             this->lores_01_cutoff,
@@ -208,25 +214,28 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
         this->gen_01_perform(
             this->signals[1],
-            this->gen_01_a2,
             this->gen_01_feedback,
-            this->gen_01_dampen,
-            this->gen_01_a1,
             this->gen_01_note,
-            this->signals[0],
+            this->gen_01_dampen,
+            this->gen_01_a,
+            this->gen_01_b,
+            this->signals[2],
+            this->signals[3],
             n
         );
     
         this->dspexpr_01_perform(
-            this->signals[0],
+            this->signals[2],
             this->dspexpr_01_in2,
             this->dspexpr_01_in3,
             this->signals[1],
             n
         );
     
-        this->signaladder_01_perform(this->signals[1], out2, out2, n);
-        this->signaladder_02_perform(this->signals[1], out1, out1, n);
+        this->signaladder_01_perform(this->signals[1], out1, out1, n);
+        this->signaladder_02_perform(this->signals[1], out2, out2, n);
+        this->numbertilde_01_perform(this->signals[3], this->dummyBuffer, n);
+        this->scopetilde_01_perform(this->signals[0], this->zeroBuffer, n);
         this->stackprotect_perform(n);
         this->audioProcessSampleCount += this->vs;
     }
@@ -235,11 +244,10 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         if (this->maxvs < maxBlockSize || !this->didAllocateSignals) {
             Index i;
     
-            for (i = 0; i < 2; i++) {
+            for (i = 0; i < 4; i++) {
                 this->signals[i] = resizeSignal(this->signals[i], this->maxvs, maxBlockSize);
             }
     
-            this->click_01_buf = resizeSignal(this->click_01_buf, this->maxvs, maxBlockSize);
             this->zeroBuffer = resizeSignal(this->zeroBuffer, this->maxvs, maxBlockSize);
             this->dummyBuffer = resizeSignal(this->dummyBuffer, this->maxvs, maxBlockSize);
             this->didAllocateSignals = true;
@@ -258,6 +266,8 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
         this->lores_01_dspsetup(forceDSPSetup);
         this->gen_01_dspsetup(forceDSPSetup);
+        this->numbertilde_01_dspsetup(forceDSPSetup);
+        this->scopetilde_01_dspsetup(forceDSPSetup);
     
         if (sampleRateChanged)
             this->onSampleRateChanged(sampleRate);
@@ -437,11 +447,11 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             }
         case 3:
             {
-            return "a1";
+            return "dispersion";
             }
         case 4:
             {
-            return "a2";
+            return "tuning";
             }
         default:
             {
@@ -466,11 +476,11 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             }
         case 3:
             {
-            return "poly/a1";
+            return "poly/dispersion";
             }
         case 4:
             {
-            return "poly/a2";
+            return "poly/tuning";
             }
         default:
             {
@@ -485,9 +495,9 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             case 0:
                 {
                 info->type = ParameterTypeNumber;
-                info->initialValue = 200;
+                info->initialValue = 2000;
                 info->min = 200;
-                info->max = 2200;
+                info->max = 10000;
                 info->exponent = 1;
                 info->steps = 0;
                 info->debug = false;
@@ -504,7 +514,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             case 1:
                 {
                 info->type = ParameterTypeNumber;
-                info->initialValue = 0.03;
+                info->initialValue = 0.003;
                 info->min = 0;
                 info->max = 1;
                 info->exponent = 1;
@@ -523,7 +533,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             case 2:
                 {
                 info->type = ParameterTypeNumber;
-                info->initialValue = 0.98;
+                info->initialValue = 0.99;
                 info->min = 0;
                 info->max = 1;
                 info->exponent = 1;
@@ -542,7 +552,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             case 3:
                 {
                 info->type = ParameterTypeNumber;
-                info->initialValue = 0.01;
+                info->initialValue = 1;
                 info->min = -1;
                 info->max = 1;
                 info->exponent = 1;
@@ -561,7 +571,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             case 4:
                 {
                 info->type = ParameterTypeNumber;
-                info->initialValue = 0.01;
+                info->initialValue = 0;
                 info->min = -1;
                 info->max = 1;
                 info->exponent = 1;
@@ -622,8 +632,8 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         case 0:
             {
             {
-                value = (value < 200 ? 200 : (value > 2200 ? 2200 : value));
-                ParameterValue normalizedValue = (value - 200) / (2200 - 200);
+                value = (value < 200 ? 200 : (value > 10000 ? 10000 : value));
+                ParameterValue normalizedValue = (value - 200) / (10000 - 200);
                 return normalizedValue;
             }
             }
@@ -664,7 +674,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
                 value = (value < 0 ? 0 : (value > 1 ? 1 : value));
     
                 {
-                    return 200 + value * (2200 - 200);
+                    return 200 + value * (10000 - 200);
                 }
             }
             }
@@ -719,7 +729,23 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->getPatcher()->scheduleParamInit(index + this->parameterOffset, order);
     }
     
-    void processClockEvent(MillisecondTime , ClockId , bool , ParameterValue ) {}
+    void processClockEvent(MillisecondTime time, ClockId index, bool hasValue, ParameterValue value) {
+        RNBO_UNUSED(hasValue);
+        this->updateTime(time);
+    
+        switch (index) {
+        case 861222235:
+            {
+            this->curve_01_target_bang();
+            break;
+            }
+        case -1494586265:
+            {
+            this->numbertilde_01_value_set(value);
+            break;
+            }
+        }
+    }
     
     void processOutletAtCurrentTime(EngineLink* , OutletIndex , ParameterValue ) {}
     
@@ -733,15 +759,78 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->processOutletAtCurrentTime(sender, index, value);
     }
     
-    void processNumMessage(MessageTag , MessageTag , MillisecondTime , number ) {}
+    void processNumMessage(MessageTag tag, MessageTag objectId, MillisecondTime time, number payload) {
+        this->updateTime(time);
     
-    void processListMessage(MessageTag , MessageTag , MillisecondTime , const list& ) {}
+        switch (tag) {
+        case TAG("sig"):
+            {
+            if (TAG("poly/number~_obj-30") == objectId)
+                this->numbertilde_01_sig_number_set(payload);
+    
+            break;
+            }
+        case TAG("mode"):
+            {
+            if (TAG("poly/number~_obj-30") == objectId)
+                this->numbertilde_01_mode_set(payload);
+    
+            break;
+            }
+        }
+    }
+    
+    void processListMessage(
+        MessageTag tag,
+        MessageTag objectId,
+        MillisecondTime time,
+        const list& payload
+    ) {
+        this->updateTime(time);
+    
+        switch (tag) {
+        case TAG("sig"):
+            {
+            if (TAG("poly/number~_obj-30") == objectId)
+                this->numbertilde_01_sig_list_set(payload);
+    
+            break;
+            }
+        }
+    }
     
     void processBangMessage(MessageTag , MessageTag , MillisecondTime ) {}
     
     MessageTagInfo resolveTag(MessageTag tag) const {
         switch (tag) {
-    
+        case TAG("monitor"):
+            {
+            return "monitor";
+            }
+        case TAG("poly/number~_obj-30"):
+            {
+            return "poly/number~_obj-30";
+            }
+        case TAG("assign"):
+            {
+            return "assign";
+            }
+        case TAG("setup"):
+            {
+            return "setup";
+            }
+        case TAG("poly/scope~_obj-28"):
+            {
+            return "poly/scope~_obj-28";
+            }
+        case TAG("sig"):
+            {
+            return "sig";
+            }
+        case TAG("mode"):
+            {
+            return "mode";
+            }
         }
     
         return nullptr;
@@ -774,12 +863,13 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     void processDataViewUpdate(DataRefIndex index, MillisecondTime time) {
         this->updateTime(time);
     
-        if (index == 1) {
-            this->gen_01_delay_1_buffer = new Float64Buffer(this->gen_01_delay_1_bufferobj);
+        if (index == 0) {
+            this->mtof_01_innerMtoF_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
+            this->gen_01_mtof_0_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
         }
     
-        if (index == 0) {
-            this->gen_01_mtof_0_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
+        if (index == 1) {
+            this->gen_01_delay_1_buffer = new Float64Buffer(this->gen_01_delay_1_bufferobj);
         }
     }
     
@@ -787,12 +877,29 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->gen_01_delay_1_bufferobj = initDataRef("gen_01_delay_1_bufferobj", true, nullptr, "buffer~");
         this->assign_defaults();
         this->setState();
+        this->mtof_01_innerMtoF_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
+        this->gen_01_mtof_0_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
         this->gen_01_delay_1_bufferobj->setIndex(1);
         this->gen_01_delay_1_buffer = new Float64Buffer(this->gen_01_delay_1_bufferobj);
-        this->gen_01_mtof_0_buffer = new Float64Buffer(this->getPatcher()->RNBODefaultMtofLookupTable256);
     }
     
     protected:
+    
+    void numbertilde_01_sig_number_set(number v) {
+        this->numbertilde_01_outValue = v;
+    }
+    
+    void numbertilde_01_sig_list_set(const list& v) {
+        this->numbertilde_01_outValue = v[0];
+    }
+    
+    void numbertilde_01_mode_set(number v) {
+        if (v == 1) {
+            this->numbertilde_01_currentMode = 0;
+        } else if (v == 2) {
+            this->numbertilde_01_currentMode = 1;
+        }
+    }
     
     void param_01_value_set(number v) {
         v = this->param_01_value_constrain(v);
@@ -843,7 +950,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             this->param_04_lastValue = this->param_04_value;
         }
     
-        this->gen_01_a1_set(v);
+        this->gen_01_a_set(v);
     }
     
     void param_05_value_set(number v) {
@@ -856,8 +963,12 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
             this->param_05_lastValue = this->param_05_value;
         }
     
-        this->gen_01_a2_set(v);
+        this->gen_01_b_set(v);
     }
+    
+    void curve_01_target_bang() {}
+    
+    void numbertilde_01_value_set(number ) {}
     
     number msToSamps(MillisecondTime ms, number sampleRate) {
         return ms * sampleRate * 0.001;
@@ -888,10 +999,15 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     }
     
     void initializeObjects() {
-        this->gen_01_avg_init();
+        this->mtof_01_innerScala_init();
+        this->mtof_01_init();
+        this->gen_01_history_6_init();
+        this->gen_01_history_5_init();
+        this->gen_01_history_4_init();
         this->gen_01_history_3_init();
         this->gen_01_history_2_init();
         this->gen_01_delay_1_init();
+        this->numbertilde_01_init();
     }
     
     void sendOutlet(OutletIndex index, ParameterValue value) {
@@ -901,8 +1017,12 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     void startup() {}
     
     void allocateDataRefs() {
+        this->mtof_01_innerMtoF_buffer->requestSize(65536, 1);
+        this->mtof_01_innerMtoF_buffer->setSampleRate(this->sr);
         this->gen_01_mtof_0_buffer->requestSize(65536, 1);
         this->gen_01_mtof_0_buffer->setSampleRate(this->sr);
+        this->mtof_01_innerMtoF_buffer = this->mtof_01_innerMtoF_buffer->allocateIfNeeded();
+        this->gen_01_mtof_0_buffer = this->gen_01_mtof_0_buffer->allocateIfNeeded();
         this->gen_01_delay_1_buffer = this->gen_01_delay_1_buffer->allocateIfNeeded();
     
         if (this->gen_01_delay_1_bufferobj->hasRequestedSize()) {
@@ -911,12 +1031,10 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
             this->getEngine()->sendDataRefUpdated(1);
         }
-    
-        this->gen_01_mtof_0_buffer = this->gen_01_mtof_0_buffer->allocateIfNeeded();
     }
     
     static number param_01_value_constrain(number v) {
-        v = (v > 2200 ? 2200 : (v < 200 ? 200 : v));
+        v = (v > 10000 ? 10000 : (v < 200 ? 200 : v));
         return v;
     }
     
@@ -969,8 +1087,8 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         return v;
     }
     
-    void gen_01_a1_set(number v) {
-        this->gen_01_a1 = v;
+    void gen_01_a_set(number v) {
+        this->gen_01_a = v;
     }
     
     static number param_05_value_constrain(number v) {
@@ -978,8 +1096,8 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         return v;
     }
     
-    void gen_01_a2_set(number v) {
-        this->gen_01_a2 = v;
+    void gen_01_b_set(number v) {
+        this->gen_01_b = v;
     }
     
     void notein_01_outchannel_set(number ) {}
@@ -1000,34 +1118,189 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->gen_01_note = v;
     }
     
-    void trigger_01_out2_set(number v) {
+    void trigger_02_out3_set(number v) {
         this->gen_01_note_set(v);
     }
     
-    void click_01_click_number_set(number v) {
-        for (SampleIndex i = (SampleIndex)(this->click_01_lastclick + 1); i < this->sampleOffsetIntoNextAudioBuffer; i++) {
-            this->click_01_buf[(Index)i] = 0;
-        }
-    
-        this->click_01_lastclick = this->sampleOffsetIntoNextAudioBuffer;
-        this->click_01_buf[(Index)this->click_01_lastclick] = v;
+    void expr_02_in2_set(number v) {
+        this->expr_02_in2 = v;
     }
     
-    void click_01_click_bang_bang() {
-        this->click_01_click_number_set(1);
+    void floatnum_01_out_set(number v) {
+        this->expr_02_in2_set(v);
+    }
+    
+    void floatnum_01_input_bang_bang() {
+        this->floatnum_01_out_set(this->floatnum_01_stored);
+    }
+    
+    void trigger_02_out2_bang() {
+        this->floatnum_01_input_bang_bang();
+    }
+    
+    void pack_01_in5_set(number v) {
+        this->pack_01_in5 = v;
+    }
+    
+    void pack_01_in2_set(number v) {
+        this->pack_01_in2 = v;
+    }
+    
+    void curve_01_dest_set(const list& v) {
+        this->curve_01_dest = jsCreateListCopy(v);
+    
+        if ((bool)(v->length)) {
+            if (v->length == 1 && this->curve_01_time == 0) {
+                this->curve_01_activeRamps->length = 0;
+                this->curve_01_currentValue = v[0];
+            } else {
+                number RFACTOR = (number)1 / (number)0.23;
+                number PFACTOR = 5;
+                number DIV_RFACTOR = (number)1 / (rnbo_exp(RFACTOR) - 1.);
+                auto currentTime = this->currentsampletime();
+                number lastRampEnd = currentTime;
+                number lastRampValue = this->curve_01_currentValue;
+                number rampEnd = currentTime - this->sampleOffsetIntoNextAudioBuffer;
+                this->curve_01_samplecount = 0;
+                this->curve_01_startvalue = this->curve_01_currentValue;
+    
+                for (Index i = 0; i < this->curve_01_activeRamps->length; i += 4) {
+                    rampEnd = this->curve_01_activeRamps[(Index)(i + 1)];
+    
+                    if (rampEnd > currentTime) {
+                        this->curve_01_activeRamps[(Index)i] = lastRampValue;
+                        this->curve_01_activeRamps[(Index)(i + 1)] = currentTime;
+                        this->curve_01_activeRamps->length = i + 4;
+                        rampEnd = currentTime;
+                    }
+                }
+    
+                if (rampEnd < currentTime) {
+                    this->curve_01_activeRamps->push(lastRampValue);
+                    this->curve_01_activeRamps->push(currentTime);
+                    this->curve_01_activeRamps->push(0);
+                    this->curve_01_activeRamps->push(0);
+                }
+    
+                for (Index i = 0; i < v->length; i += 3) {
+                    number destinationValue = v[(Index)i];
+                    number rampTimeInSamples;
+                    number curveFactor;
+    
+                    if (v->length > i + 1) {
+                        rampTimeInSamples = this->mstosamps(v[(Index)(i + 1)]);
+                    } else {
+                        rampTimeInSamples = this->mstosamps(this->curve_01_time);
+                    }
+    
+                    if (rampTimeInSamples <= 0)
+                        rampTimeInSamples = 1;
+    
+                    if (v->length > i + 2)
+                        curveFactor = v[(Index)(i + 2)];
+                    else
+                        curveFactor = this->curve_01_curve;
+    
+                    number f = 1 - rnbo_abs(curveFactor);
+                    number p = ((curveFactor >= 0. ? 1 : -1)) * PFACTOR * (rnbo_exp(f * RFACTOR) - 1.) * DIV_RFACTOR;
+                    p = fixdenorm(p);
+                    number div_erp = (number)1 / (rnbo_exp((number)1 / p) - 1.);
+                    number div_durp = (number)1 / (rampTimeInSamples * p);
+                    lastRampEnd += rampTimeInSamples;
+                    this->curve_01_activeRamps->push(destinationValue);
+                    this->curve_01_activeRamps->push(lastRampEnd);
+                    this->curve_01_activeRamps->push(div_erp);
+                    this->curve_01_activeRamps->push(div_durp);
+                    lastRampValue = destinationValue;
+                }
+            }
+        }
+    }
+    
+    void pack_01_out_set(const list& v) {
+        this->curve_01_dest_set(v);
+    }
+    
+    void pack_01_in1_bang() {
+        list array = list(0, 0, 0, 0, 0, 0);
+        array[0] = this->pack_01_in1;
+        array[1] = this->pack_01_in2;
+        array[2] = this->pack_01_in3;
+        array[3] = this->pack_01_in4;
+        array[4] = this->pack_01_in5;
+        array[5] = this->pack_01_in6;
+        this->pack_01_out_set(array);
     }
     
     void trigger_01_out1_bang() {
-        this->click_01_click_bang_bang();
+        this->pack_01_in1_bang();
     }
     
     void trigger_01_input_number_set(number v) {
-        this->trigger_01_out2_set(rnbo_trunc(v));
+        RNBO_UNUSED(v);
         this->trigger_01_out1_bang();
     }
     
+    void expr_01_out1_set(number v) {
+        this->expr_01_out1 = v;
+        this->pack_01_in5_set(this->expr_01_out1);
+        this->pack_01_in2_set(this->expr_01_out1);
+        this->trigger_01_input_number_set(this->expr_01_out1);
+    }
+    
+    void expr_01_in1_set(number in1) {
+        this->expr_01_in1 = in1;
+        this->expr_01_out1_set(this->expr_01_in1 * this->expr_01_in2);//#map:*_obj-3:1
+    }
+    
+    void expr_02_out1_set(number v) {
+        this->expr_02_out1 = v;
+        this->expr_01_in1_set(this->expr_02_out1);
+    }
+    
+    void expr_02_in1_set(number in1) {
+        this->expr_02_in1 = in1;
+        this->expr_02_out1_set((this->expr_02_in1 == 0. ? 0. : this->expr_02_in2 / this->expr_02_in1));//#map:!/_obj-9:1
+    }
+    
+    void mtof_01_out_set(const list& v) {
+        {
+            if (v->length > 1)
+                this->expr_02_in2_set(v[1]);
+    
+            number converted = (v->length > 0 ? v[0] : 0);
+            this->expr_02_in1_set(converted);
+        }
+    }
+    
+    void mtof_01_midivalue_set(const list& v) {
+        this->mtof_01_midivalue = jsCreateListCopy(v);
+        list tmp = list();
+    
+        for (int i = 0; i < this->mtof_01_midivalue->length; i++) {
+            tmp->push(
+                this->mtof_01_innerMtoF_next(this->mtof_01_midivalue[(Index)i], this->mtof_01_base)
+            );
+        }
+    
+        this->mtof_01_out_set(tmp);
+    }
+    
+    void trigger_02_out1_set(number v) {
+        {
+            list converted = {v};
+            this->mtof_01_midivalue_set(converted);
+        }
+    }
+    
+    void trigger_02_input_number_set(number v) {
+        this->trigger_02_out3_set(trunc(v));
+        this->trigger_02_out2_bang();
+        this->trigger_02_out1_set(v);
+    }
+    
     void stripnote_01_notenumber_out_set(number v) {
-        this->trigger_01_input_number_set(v);
+        this->trigger_02_input_number_set(v);
     }
     
     void stripnote_01_notenumber_set(number v) {
@@ -1064,20 +1337,61 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
     void midiouthelper_midiout_set(number ) {}
     
-    void click_01_perform(SampleValue * out, Index n) {
-        auto __click_01_buf = this->click_01_buf;
-        auto __click_01_lastclick = this->click_01_lastclick;
+    void curve_01_perform(SampleValue * out, Index n) {
+        auto __curve_01_time = this->curve_01_time;
+        auto __curve_01_startvalue = this->curve_01_startvalue;
+        auto __curve_01_samplecount = this->curve_01_samplecount;
+        auto __curve_01_currentValue = this->curve_01_currentValue;
+        Index i = 0;
     
-        for (SampleIndex i = 0; i <= __click_01_lastclick; i++) {
-            out[(Index)i] = __click_01_buf[(Index)i];
+        if ((bool)(this->curve_01_activeRamps->length)) {
+            while ((bool)(this->curve_01_activeRamps->length) && i < n) {
+                number destinationValue = this->curve_01_activeRamps[0];
+                number rampTimeInSamples = this->curve_01_activeRamps[1] - this->audioProcessSampleCount - i;
+                number val = __curve_01_currentValue;
+                number div_erp = this->curve_01_activeRamps[2];
+                number div_durp = this->curve_01_activeRamps[3];
+    
+                while (rampTimeInSamples > 0 && i < n) {
+                    number curv = (rnbo_exp(__curve_01_samplecount * div_durp) - 1) * div_erp;
+                    val += __curve_01_startvalue - val + curv * (destinationValue - __curve_01_startvalue);
+                    out[(Index)i] = val;
+                    i++;
+                    __curve_01_samplecount++;
+                    rampTimeInSamples--;
+                }
+    
+                if (rampTimeInSamples <= 0) {
+                    __curve_01_samplecount = 0;
+                    val = destinationValue;
+                    __curve_01_startvalue = val;
+                    this->curve_01_activeRamps->splice(0, 4);
+    
+                    if ((bool)(!(bool)(this->curve_01_activeRamps->length))) {
+                        this->getEngine()->scheduleClockEventWithValue(
+                            this,
+                            861222235,
+                            this->sampsToMs((SampleIndex)(this->vs)) + this->_currentTime,
+                            0
+                        );;
+    
+                        __curve_01_time = 0;
+                    }
+                }
+    
+                __curve_01_currentValue = val;
+            }
         }
     
-        for (SampleIndex i = (SampleIndex)(__click_01_lastclick + 1); i < (SampleIndex)(n); i++) {
-            out[(Index)i] = 0;
+        while (i < n) {
+            out[(Index)i] = __curve_01_currentValue;
+            i++;
         }
     
-        __click_01_lastclick = -1;
-        this->click_01_lastclick = __click_01_lastclick;
+        this->curve_01_currentValue = __curve_01_currentValue;
+        this->curve_01_samplecount = __curve_01_samplecount;
+        this->curve_01_startvalue = __curve_01_startvalue;
+        this->curve_01_time = __curve_01_time;
     }
     
     void lores_01_perform(
@@ -1133,50 +1447,65 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
     void gen_01_perform(
         const Sample * in1,
-        number a2,
         number feedback,
-        number dampen,
-        number a1,
         number note,
+        number dampen,
+        number a,
+        number b,
         SampleValue * out1,
+        SampleValue * out2,
         Index n
     ) {
-        auto __gen_01_avg_value = this->gen_01_avg_value;
+        auto __gen_01_history_6_value = this->gen_01_history_6_value;
         auto __gen_01_history_2_value = this->gen_01_history_2_value;
+        auto __gen_01_history_4_value = this->gen_01_history_4_value;
         auto __gen_01_history_3_value = this->gen_01_history_3_value;
+        auto __gen_01_history_5_value = this->gen_01_history_5_value;
+        number rsub_13_8 = 1 - a;
+        number mul_14_9 = rsub_13_8 * b;
+        number mul_17_12 = a * -1;
         Index i;
     
         for (i = 0; i < n; i++) {
-            number mtof_4_1 = this->gen_01_mtof_0_next(note, 440);
-            number rdiv_5_2 = (mtof_4_1 == 0. ? 0. : this->samplerate() / mtof_4_1);
-            number tap_6_3 = this->gen_01_delay_1_read(rdiv_5_2, 2);
-            out1[(Index)i] = tap_6_3;
-            number dcblock_7_5 = this->gen_01_dcblock_4_next(tap_6_3, 0.9997);
-            number add_8_6 = dcblock_7_5 + __gen_01_history_3_value;
-            number gte_9_7 = add_8_6 >= 0;
-            number mul_10_8 = a2 * gte_9_7;
-            number rsub_11_9 = 1 - gte_9_7;
-            number mul_12_10 = a1 * rsub_11_9;
-            number add_13_11 = mul_12_10 + mul_10_8;
-            number mul_14_12 = add_8_6 * add_13_11;
-            number add_15_13 = mul_14_12 + __gen_01_history_2_value;
-            number gen_16_14 = add_15_13;
-            number mul_17_15 = mul_14_12 * -1;
-            number history_2_next_18_16 = fixdenorm(add_8_6);
-            number history_3_next_19_17 = fixdenorm(mul_17_15);
-            number mul_20_18 = gen_16_14 * feedback;
-            number mix_21_19 = mul_20_18 + dampen * (__gen_01_avg_value - mul_20_18);
-            number avg_next_22_20 = fixdenorm(mix_21_19);
-            this->gen_01_delay_1_write(in1[(Index)i] + __gen_01_avg_value);
-            __gen_01_avg_value = avg_next_22_20;
-            __gen_01_history_3_value = history_3_next_19_17;
-            __gen_01_history_2_value = history_2_next_18_16;
+            number mtof_7_1 = this->gen_01_mtof_0_next(note, 440);
+            number rdiv_8_2 = (mtof_7_1 == 0. ? 0. : this->samplerate() / mtof_7_1);
+            out2[(Index)i] = rdiv_8_2;
+            number tap_9_3 = this->gen_01_delay_1_read(rdiv_8_2, 0);
+            out1[(Index)i] = tap_9_3;
+            number dcblock_10_5 = this->gen_01_dcblock_4_next(tap_9_3, 0.9997);
+            number mul_11_6 = __gen_01_history_5_value * -1;
+            number mul_12_7 = __gen_01_history_3_value * a;
+            number mul_15_10 = mul_11_6 * mul_14_9;
+            number mul_16_11 = __gen_01_history_4_value * mul_14_9;
+            number mul_18_13 = mul_17_12 * dcblock_10_5;
+            number add_19_14 = mul_18_13 + __gen_01_history_2_value;
+            number add_20_15 = add_19_14 + mul_16_11;
+            number add_21_16 = mul_12_7 + add_20_15;
+            number add_22_17 = add_21_16 + mul_15_10;
+            number gen_23_18 = add_22_17;
+            number history_2_next_24_19 = fixdenorm(__gen_01_history_4_value);
+            number history_3_next_25_20 = fixdenorm(__gen_01_history_5_value);
+            number history_4_next_26_21 = fixdenorm(dcblock_10_5);
+            number history_5_next_27_22 = fixdenorm(add_22_17);
+            number mul_28_23 = gen_23_18 * feedback;
+            number mul_29_24 = __gen_01_history_6_value * -1;
+            number mix_30_25 = mul_28_23 + dampen * (mul_29_24 - mul_28_23);
+            number gen_31_26 = mix_30_25;
+            number history_6_next_32_27 = fixdenorm(mix_30_25);
+            this->gen_01_delay_1_write(in1[(Index)i] + gen_31_26);
+            __gen_01_history_6_value = history_6_next_32_27;
+            __gen_01_history_3_value = history_3_next_25_20;
+            __gen_01_history_4_value = history_4_next_26_21;
+            __gen_01_history_5_value = history_5_next_27_22;
+            __gen_01_history_2_value = history_2_next_24_19;
             this->gen_01_delay_1_step();
         }
     
+        this->gen_01_history_5_value = __gen_01_history_5_value;
         this->gen_01_history_3_value = __gen_01_history_3_value;
+        this->gen_01_history_4_value = __gen_01_history_4_value;
         this->gen_01_history_2_value = __gen_01_history_2_value;
-        this->gen_01_avg_value = __gen_01_avg_value;
+        this->gen_01_history_6_value = __gen_01_history_6_value;
     }
     
     void dspexpr_01_perform(const Sample * in1, number in2, number in3, SampleValue * out1, Index n) {
@@ -1215,6 +1544,113 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         }
     }
     
+    void numbertilde_01_perform(const SampleValue * input_signal, SampleValue * output, Index n) {
+        auto __numbertilde_01_currentIntervalInSamples = this->numbertilde_01_currentIntervalInSamples;
+        auto __numbertilde_01_lastValue = this->numbertilde_01_lastValue;
+        auto __numbertilde_01_currentInterval = this->numbertilde_01_currentInterval;
+        auto __numbertilde_01_rampInSamples = this->numbertilde_01_rampInSamples;
+        auto __numbertilde_01_outValue = this->numbertilde_01_outValue;
+        auto __numbertilde_01_currentMode = this->numbertilde_01_currentMode;
+        number monitorvalue = input_signal[0];
+    
+        for (Index i = 0; i < n; i++) {
+            if (__numbertilde_01_currentMode == 0) {
+                output[(Index)i] = this->numbertilde_01_smooth_next(
+                    __numbertilde_01_outValue,
+                    __numbertilde_01_rampInSamples,
+                    __numbertilde_01_rampInSamples
+                );
+            } else {
+                output[(Index)i] = input_signal[(Index)i];
+            }
+        }
+    
+        __numbertilde_01_currentInterval -= n;
+    
+        if (monitorvalue != __numbertilde_01_lastValue && __numbertilde_01_currentInterval <= 0) {
+            __numbertilde_01_currentInterval = __numbertilde_01_currentIntervalInSamples;
+    
+            this->getEngine()->scheduleClockEventWithValue(
+                this,
+                -1494586265,
+                this->sampsToMs((SampleIndex)(this->vs)) + this->_currentTime,
+                monitorvalue
+            );;
+    
+            __numbertilde_01_lastValue = monitorvalue;
+    
+            this->getEngine()->sendListMessage(
+                TAG("monitor"),
+                TAG("poly/number~_obj-30"),
+                {monitorvalue},
+                this->_currentTime
+            );;
+        }
+    
+        this->numbertilde_01_currentInterval = __numbertilde_01_currentInterval;
+        this->numbertilde_01_lastValue = __numbertilde_01_lastValue;
+    }
+    
+    void scopetilde_01_perform(const SampleValue * x, const SampleValue * y, Index n) {
+        auto __scopetilde_01_ysign = this->scopetilde_01_ysign;
+        auto __scopetilde_01_ymonitorvalue = this->scopetilde_01_ymonitorvalue;
+        auto __scopetilde_01_xsign = this->scopetilde_01_xsign;
+        auto __scopetilde_01_xmonitorvalue = this->scopetilde_01_xmonitorvalue;
+        auto __scopetilde_01_mode = this->scopetilde_01_mode;
+    
+        for (Index i = 0; i < n; i++) {
+            number xval = x[(Index)i];
+            number yval = y[(Index)i];
+    
+            if (__scopetilde_01_mode == 1) {
+                number xabsval = rnbo_abs(xval);
+    
+                if (xabsval > __scopetilde_01_xmonitorvalue) {
+                    __scopetilde_01_xmonitorvalue = xabsval;
+                    __scopetilde_01_xsign = (xval < 0 ? -1 : 1);
+                }
+    
+                number yabsval = rnbo_abs(yval);
+    
+                if (yabsval > __scopetilde_01_ymonitorvalue) {
+                    __scopetilde_01_ymonitorvalue = yabsval;
+                    __scopetilde_01_ysign = (yval < 0 ? -1 : 1);
+                }
+            } else {
+                __scopetilde_01_xmonitorvalue = xval;
+                __scopetilde_01_xsign = 1;
+                __scopetilde_01_ymonitorvalue = yval;
+                __scopetilde_01_ysign = 1;
+            }
+    
+            this->scopetilde_01_effectiveCount--;
+    
+            if (this->scopetilde_01_effectiveCount <= 0) {
+                this->scopetilde_01_updateEffectiveCount();
+                this->scopetilde_01_monitorbuffer->push(__scopetilde_01_xmonitorvalue * __scopetilde_01_xsign);
+    
+                if (__scopetilde_01_mode == 1)
+                    __scopetilde_01_xmonitorvalue = 0;
+    
+                if (this->scopetilde_01_monitorbuffer->length >= 128 * (1 + 0)) {
+                    this->getEngine()->sendListMessage(
+                        TAG("monitor"),
+                        TAG("poly/scope~_obj-28"),
+                        this->scopetilde_01_monitorbuffer,
+                        this->_currentTime
+                    );;
+    
+                    this->scopetilde_01_monitorbuffer->length = 0;
+                }
+            }
+        }
+    
+        this->scopetilde_01_xmonitorvalue = __scopetilde_01_xmonitorvalue;
+        this->scopetilde_01_xsign = __scopetilde_01_xsign;
+        this->scopetilde_01_ymonitorvalue = __scopetilde_01_ymonitorvalue;
+        this->scopetilde_01_ysign = __scopetilde_01_ysign;
+    }
+    
     void stackprotect_perform(Index n) {
         RNBO_UNUSED(n);
         auto __stackprotect_count = this->stackprotect_count;
@@ -1232,20 +1668,423 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->lores_01_resonance = v;
     }
     
-    number gen_01_avg_getvalue() {
-        return this->gen_01_avg_value;
+    number mtof_01_innerMtoF_next(number midivalue, number tuning) {
+        if (midivalue == this->mtof_01_innerMtoF_lastInValue && tuning == this->mtof_01_innerMtoF_lastTuning)
+            return this->mtof_01_innerMtoF_lastOutValue;
+    
+        this->mtof_01_innerMtoF_lastInValue = midivalue;
+        this->mtof_01_innerMtoF_lastTuning = tuning;
+        number result = 0;
+    
+        {
+            result = rnbo_exp(.057762265 * (midivalue - 69.0));
+        }
+    
+        this->mtof_01_innerMtoF_lastOutValue = tuning * result;
+        return this->mtof_01_innerMtoF_lastOutValue;
     }
     
-    void gen_01_avg_setvalue(number val) {
-        this->gen_01_avg_value = val;
+    void mtof_01_innerMtoF_reset() {
+        this->mtof_01_innerMtoF_lastInValue = 0;
+        this->mtof_01_innerMtoF_lastOutValue = 0;
+        this->mtof_01_innerMtoF_lastTuning = 0;
     }
     
-    void gen_01_avg_reset() {
-        this->gen_01_avg_value = 0;
+    void mtof_01_innerScala_mid(int v) {
+        this->mtof_01_innerScala_kbmMid = v;
+        this->mtof_01_innerScala_updateRefFreq();
     }
     
-    void gen_01_avg_init() {
-        this->gen_01_avg_value = 0;
+    void mtof_01_innerScala_ref(int v) {
+        this->mtof_01_innerScala_kbmRefNum = v;
+        this->mtof_01_innerScala_updateRefFreq();
+    }
+    
+    void mtof_01_innerScala_base(number v) {
+        this->mtof_01_innerScala_kbmRefFreq = v;
+        this->mtof_01_innerScala_updateRefFreq();
+    }
+    
+    void mtof_01_innerScala_init() {
+        list sclValid = {
+            12,
+            100,
+            0,
+            200,
+            0,
+            300,
+            0,
+            400,
+            0,
+            500,
+            0,
+            600,
+            0,
+            700,
+            0,
+            800,
+            0,
+            900,
+            0,
+            1000,
+            0,
+            1100,
+            0,
+            2,
+            1
+        };
+    
+        this->mtof_01_innerScala_updateScale(sclValid);
+    }
+    
+    void mtof_01_innerScala_update(list scale, list map) {
+        if (scale->length > 0) {
+            this->mtof_01_innerScala_updateScale(scale);
+        }
+    
+        if (map->length > 0) {
+            this->mtof_01_innerScala_updateMap(map);
+        }
+    }
+    
+    number mtof_01_innerScala_mtof(number note) {
+        if ((bool)(this->mtof_01_innerScala_lastValid) && this->mtof_01_innerScala_lastNote == note) {
+            return this->mtof_01_innerScala_lastFreq;
+        }
+    
+        array<int, 2> degoct = this->mtof_01_innerScala_applyKBM(note);
+        number out = 0;
+    
+        if (degoct[1] > 0) {
+            out = this->mtof_01_innerScala_applySCL(degoct[0], fract(note), this->mtof_01_innerScala_refFreq);
+        }
+    
+        this->mtof_01_innerScala_updateLast(note, out);
+        return out;
+    }
+    
+    number mtof_01_innerScala_ftom(number hz) {
+        if (hz <= 0.0) {
+            return 0.0;
+        }
+    
+        if ((bool)(this->mtof_01_innerScala_lastValid) && this->mtof_01_innerScala_lastFreq == hz) {
+            return this->mtof_01_innerScala_lastNote;
+        }
+    
+        array<number, 2> df = this->mtof_01_innerScala_hztodeg(hz);
+        int degree = (int)(df[0]);
+        number frac = df[1];
+        number out = 0;
+    
+        if (this->mtof_01_innerScala_kbmSize == 0) {
+            out = this->mtof_01_innerScala_kbmMid + degree;
+        } else {
+            array<int, 2> octdeg = this->mtof_01_innerScala_octdegree(degree, this->mtof_01_innerScala_kbmOctaveDegree);
+            number oct = (number)(octdeg[0]);
+            int index = (int)(octdeg[1]);
+            Index entry = 0;
+    
+            for (Index i = 0; i < this->mtof_01_innerScala_kbmMapSize; i++) {
+                if (index == this->mtof_01_innerScala_kbmValid[(Index)(i + this->mtof_01_innerScala_KBM_MAP_OFFSET)]) {
+                    entry = i;
+                    break;
+                }
+            }
+    
+            out = oct * this->mtof_01_innerScala_kbmSize + entry + this->mtof_01_innerScala_kbmMid;
+        }
+    
+        out = out + frac;
+        this->mtof_01_innerScala_updateLast(out, hz);
+        return this->mtof_01_innerScala_lastNote;
+    }
+    
+    int mtof_01_innerScala_updateScale(list scl) {
+        if (scl->length > 1 && scl[0] * 2 + 1 == scl->length) {
+            this->mtof_01_innerScala_lastValid = false;
+            this->mtof_01_innerScala_sclExpMul = {};
+            number last = 1;
+    
+            for (Index i = 1; i < scl->length; i += 2) {
+                const number c = (const number)(scl[(Index)(i + 0)]);
+                const number d = (const number)(scl[(Index)(i + 1)]);
+    
+                if (d <= 0) {
+                    last = c / (number)1200;
+                } else {
+                    last = rnbo_log2(c / d);
+                }
+    
+                this->mtof_01_innerScala_sclExpMul->push(last);
+            }
+    
+            this->mtof_01_innerScala_sclOctaveMul = last;
+            this->mtof_01_innerScala_sclEntryCount = (int)(this->mtof_01_innerScala_sclExpMul->length);
+            this->mtof_01_innerScala_updateRefFreq();
+            return 1;
+        }
+    
+        return 0;
+    }
+    
+    int mtof_01_innerScala_updateMap(list kbm) {
+        if (kbm->length == 1 && kbm[0] == 0.0) {
+            kbm = {0.0, 0.0, 0.0, 60.0, 69.0, 440.0};
+        }
+    
+        if (kbm->length >= 6 && kbm[0] >= 0.0) {
+            this->mtof_01_innerScala_lastValid = false;
+            Index size = (Index)(kbm[0]);
+            int octave = 12;
+    
+            if (kbm->length > 6) {
+                octave = (int)(kbm[6]);
+            }
+    
+            if (size > 0 && kbm->length < this->mtof_01_innerScala_KBM_MAP_OFFSET) {
+                return 0;
+            }
+    
+            this->mtof_01_innerScala_kbmSize = (int)(size);
+            this->mtof_01_innerScala_kbmMin = (int)(kbm[1]);
+            this->mtof_01_innerScala_kbmMax = (int)(kbm[2]);
+            this->mtof_01_innerScala_kbmMid = (int)(kbm[3]);
+            this->mtof_01_innerScala_kbmRefNum = (int)(kbm[4]);
+            this->mtof_01_innerScala_kbmRefFreq = kbm[5];
+            this->mtof_01_innerScala_kbmOctaveDegree = octave;
+            this->mtof_01_innerScala_kbmValid = kbm;
+            this->mtof_01_innerScala_kbmMapSize = (kbm->length - this->mtof_01_innerScala_KBM_MAP_OFFSET > kbm->length ? kbm->length : (kbm->length - this->mtof_01_innerScala_KBM_MAP_OFFSET < 0 ? 0 : kbm->length - this->mtof_01_innerScala_KBM_MAP_OFFSET));
+            this->mtof_01_innerScala_updateRefFreq();
+            return 1;
+        }
+    
+        return 0;
+    }
+    
+    void mtof_01_innerScala_updateLast(number note, number freq) {
+        this->mtof_01_innerScala_lastValid = true;
+        this->mtof_01_innerScala_lastNote = note;
+        this->mtof_01_innerScala_lastFreq = freq;
+    }
+    
+    array<number, 2> mtof_01_innerScala_hztodeg(number hz) {
+        number hza = rnbo_abs(hz);
+    
+        number octave = rnbo_floor(
+            rnbo_log2(hza / this->mtof_01_innerScala_refFreq) / this->mtof_01_innerScala_sclOctaveMul
+        );
+    
+        int i = 0;
+        number frac = 0;
+        number n = 0;
+    
+        for (; i < this->mtof_01_innerScala_sclEntryCount; i++) {
+            number c = this->mtof_01_innerScala_applySCLOctIndex(octave, i + 0, 0.0, this->mtof_01_innerScala_refFreq);
+            n = this->mtof_01_innerScala_applySCLOctIndex(octave, i + 1, 0.0, this->mtof_01_innerScala_refFreq);
+    
+            if (c <= hza && hza < n) {
+                if (c != hza) {
+                    frac = rnbo_log2(hza / c) / rnbo_log2(n / c);
+                }
+    
+                break;
+            }
+        }
+    
+        if (i == this->mtof_01_innerScala_sclEntryCount && n != hza) {
+            number c = n;
+            n = this->mtof_01_innerScala_applySCLOctIndex(octave + 1, 0, 0.0, this->mtof_01_innerScala_refFreq);
+            frac = rnbo_log2(hza / c) / rnbo_log2(n / c);
+        }
+    
+        number deg = i + octave * this->mtof_01_innerScala_sclEntryCount;
+    
+        {
+            deg = rnbo_fround((deg + frac) * 1 / (number)1) * 1;
+            frac = 0.0;
+        }
+    
+        return {deg, frac};
+    }
+    
+    array<int, 2> mtof_01_innerScala_octdegree(int degree, int count) {
+        int octave = 0;
+        int index = 0;
+    
+        if (degree < 0) {
+            octave = -(1 + (-1 - degree) / count);
+            index = -degree % count;
+    
+            if (index > 0) {
+                index = count - index;
+            }
+        } else {
+            octave = degree / count;
+            index = degree % count;
+        }
+    
+        return {octave, index};
+    }
+    
+    array<int, 2> mtof_01_innerScala_applyKBM(number note) {
+        if ((this->mtof_01_innerScala_kbmMin == this->mtof_01_innerScala_kbmMax && this->mtof_01_innerScala_kbmMax == 0) || (note >= this->mtof_01_innerScala_kbmMin && note <= this->mtof_01_innerScala_kbmMax)) {
+            int degree = (int)(rnbo_floor(note - this->mtof_01_innerScala_kbmMid));
+    
+            if (this->mtof_01_innerScala_kbmSize == 0) {
+                return {degree, 1};
+            }
+    
+            array<int, 2> octdeg = this->mtof_01_innerScala_octdegree(degree, this->mtof_01_innerScala_kbmSize);
+            int octave = (int)(octdeg[0]);
+            Index index = (Index)(octdeg[1]);
+    
+            if (this->mtof_01_innerScala_kbmMapSize > index) {
+                degree = (int)(this->mtof_01_innerScala_kbmValid[(Index)(this->mtof_01_innerScala_KBM_MAP_OFFSET + index)]);
+    
+                if (degree >= 0) {
+                    return {degree + octave * this->mtof_01_innerScala_kbmOctaveDegree, 1};
+                }
+            }
+        }
+    
+        return {-1, 0};
+    }
+    
+    number mtof_01_innerScala_applySCL(int degree, number frac, number refFreq) {
+        array<int, 2> octdeg = this->mtof_01_innerScala_octdegree(degree, this->mtof_01_innerScala_sclEntryCount);
+        return this->mtof_01_innerScala_applySCLOctIndex(octdeg[0], octdeg[1], frac, refFreq);
+    }
+    
+    number mtof_01_innerScala_applySCLOctIndex(number octave, int index, number frac, number refFreq) {
+        number p = 0;
+    
+        if (index > 0) {
+            p = this->mtof_01_innerScala_sclExpMul[(Index)(index - 1)];
+        }
+    
+        if (frac > 0) {
+            p = this->linearinterp(frac, p, this->mtof_01_innerScala_sclExpMul[(Index)index]);
+        } else if (frac < 0) {
+            p = this->linearinterp(-frac, this->mtof_01_innerScala_sclExpMul[(Index)index], p);
+        }
+    
+        return refFreq * rnbo_pow(2, p + octave * this->mtof_01_innerScala_sclOctaveMul);
+    }
+    
+    void mtof_01_innerScala_updateRefFreq() {
+        this->mtof_01_innerScala_lastValid = false;
+        int refOffset = (int)(this->mtof_01_innerScala_kbmRefNum - this->mtof_01_innerScala_kbmMid);
+    
+        if (refOffset == 0) {
+            this->mtof_01_innerScala_refFreq = this->mtof_01_innerScala_kbmRefFreq;
+        } else {
+            int base = (int)(this->mtof_01_innerScala_kbmSize);
+    
+            if (base < 1) {
+                base = this->mtof_01_innerScala_sclEntryCount;
+            }
+    
+            array<int, 2> octdeg = this->mtof_01_innerScala_octdegree(refOffset, base);
+            number oct = (number)(octdeg[0]);
+            int index = (int)(octdeg[1]);
+    
+            if (base > 0) {
+                oct = oct + rnbo_floor(index / base);
+                index = index % base;
+            }
+    
+            if (index >= 0 && index < this->mtof_01_innerScala_kbmSize) {
+                if (index < this->mtof_01_innerScala_kbmMapSize) {
+                    index = (int)(this->mtof_01_innerScala_kbmValid[(Index)((Index)(index) + this->mtof_01_innerScala_KBM_MAP_OFFSET)]);
+                } else {
+                    index = -1;
+                }
+            }
+    
+            if (index < 0 || index > this->mtof_01_innerScala_sclExpMul->length)
+                {} else {
+                number p = 0;
+    
+                if (index > 0) {
+                    p = this->mtof_01_innerScala_sclExpMul[(Index)(index - 1)];
+                }
+    
+                this->mtof_01_innerScala_refFreq = this->mtof_01_innerScala_kbmRefFreq / rnbo_pow(2, p + oct * this->mtof_01_innerScala_sclOctaveMul);
+            }
+        }
+    }
+    
+    void mtof_01_innerScala_reset() {
+        this->mtof_01_innerScala_internal = true;
+        this->mtof_01_innerScala_lastValid = false;
+        this->mtof_01_innerScala_lastNote = 0;
+        this->mtof_01_innerScala_lastFreq = 0;
+        this->mtof_01_innerScala_sclEntryCount = 0;
+        this->mtof_01_innerScala_sclOctaveMul = 1;
+        this->mtof_01_innerScala_sclExpMul = {};
+        this->mtof_01_innerScala_kbmValid = {0, 0, 0, 60, 69, 440};
+        this->mtof_01_innerScala_kbmMid = 60;
+        this->mtof_01_innerScala_kbmRefNum = 69;
+        this->mtof_01_innerScala_kbmRefFreq = 440;
+        this->mtof_01_innerScala_kbmSize = 0;
+        this->mtof_01_innerScala_kbmMin = 0;
+        this->mtof_01_innerScala_kbmMax = 0;
+        this->mtof_01_innerScala_kbmOctaveDegree = 12;
+        this->mtof_01_innerScala_kbmMapSize = 0;
+        this->mtof_01_innerScala_refFreq = 261.63;
+    }
+    
+    void mtof_01_init() {
+        this->mtof_01_innerScala_update(this->mtof_01_scale, this->mtof_01_map);
+    }
+    
+    number gen_01_history_6_getvalue() {
+        return this->gen_01_history_6_value;
+    }
+    
+    void gen_01_history_6_setvalue(number val) {
+        this->gen_01_history_6_value = val;
+    }
+    
+    void gen_01_history_6_reset() {
+        this->gen_01_history_6_value = 0;
+    }
+    
+    void gen_01_history_6_init() {
+        this->gen_01_history_6_value = 0;
+    }
+    
+    number gen_01_history_5_getvalue() {
+        return this->gen_01_history_5_value;
+    }
+    
+    void gen_01_history_5_setvalue(number val) {
+        this->gen_01_history_5_value = val;
+    }
+    
+    void gen_01_history_5_reset() {
+        this->gen_01_history_5_value = 0;
+    }
+    
+    void gen_01_history_5_init() {
+        this->gen_01_history_5_value = 0;
+    }
+    
+    number gen_01_history_4_getvalue() {
+        return this->gen_01_history_4_value;
+    }
+    
+    void gen_01_history_4_setvalue(number val) {
+        this->gen_01_history_4_value = val;
+    }
+    
+    void gen_01_history_4_reset() {
+        this->gen_01_history_4_value = 0;
+    }
+    
+    void gen_01_history_4_init() {
+        this->gen_01_history_4_value = 0;
     }
     
     number gen_01_history_3_getvalue() {
@@ -1291,30 +2130,18 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         RNBO_UNUSED(interp);
     
         {
-            {
-                {
-                    number r = (int)(this->gen_01_delay_1_buffer->getSize()) + this->gen_01_delay_1_reader - ((size > this->gen_01_delay_1__maxdelay ? this->gen_01_delay_1__maxdelay : (size < (1 + this->gen_01_delay_1_reader != this->gen_01_delay_1_writer) ? 1 + this->gen_01_delay_1_reader != this->gen_01_delay_1_writer : size)));
-                    long index1 = (long)(rnbo_floor(r));
-                    number frac = r - index1;
-                    Index index2 = (Index)(index1 + 1);
-                    Index index3 = (Index)(index2 + 1);
-                    Index index4 = (Index)(index3 + 1);
+            number r = (int)(this->gen_01_delay_1_buffer->getSize()) + this->gen_01_delay_1_reader - ((size > this->gen_01_delay_1__maxdelay ? this->gen_01_delay_1__maxdelay : (size < (this->gen_01_delay_1_reader != this->gen_01_delay_1_writer) ? this->gen_01_delay_1_reader != this->gen_01_delay_1_writer : size)));
+            long index1 = (long)(rnbo_floor(r));
+            number frac = r - index1;
+            long index2 = (long)(index1 + 1);
     
-                    return this->splineinterp(frac, this->gen_01_delay_1_buffer->getSample(
-                        0,
-                        (Index)((BinOpInt)((UBinOpInt)index1 & (UBinOpInt)this->gen_01_delay_1_wrap))
-                    ), this->gen_01_delay_1_buffer->getSample(
-                        0,
-                        (Index)((BinOpInt)((UBinOpInt)index2 & (UBinOpInt)this->gen_01_delay_1_wrap))
-                    ), this->gen_01_delay_1_buffer->getSample(
-                        0,
-                        (Index)((BinOpInt)((UBinOpInt)index3 & (UBinOpInt)this->gen_01_delay_1_wrap))
-                    ), this->gen_01_delay_1_buffer->getSample(
-                        0,
-                        (Index)((BinOpInt)((UBinOpInt)index4 & (UBinOpInt)this->gen_01_delay_1_wrap))
-                    ));
-                }
-            }
+            return this->linearinterp(frac, this->gen_01_delay_1_buffer->getSample(
+                0,
+                (Index)((BinOpInt)((BinOpInt)index1 & (BinOpInt)this->gen_01_delay_1_wrap))
+            ), this->gen_01_delay_1_buffer->getSample(
+                0,
+                (Index)((BinOpInt)((BinOpInt)index2 & (BinOpInt)this->gen_01_delay_1_wrap))
+            ));
         }
     
         number r = (int)(this->gen_01_delay_1_buffer->getSize()) + this->gen_01_delay_1_reader - ((size > this->gen_01_delay_1__maxdelay ? this->gen_01_delay_1__maxdelay : (size < (this->gen_01_delay_1_reader != this->gen_01_delay_1_writer) ? this->gen_01_delay_1_reader != this->gen_01_delay_1_writer : size)));
@@ -1322,7 +2149,7 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
         return this->gen_01_delay_1_buffer->getSample(
             0,
-            (Index)((BinOpInt)((UBinOpInt)index1 & (UBinOpInt)this->gen_01_delay_1_wrap))
+            (Index)((BinOpInt)((BinOpInt)index1 & (BinOpInt)this->gen_01_delay_1_wrap))
         );
     }
     
@@ -1463,6 +2290,98 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         this->lores_01_setupDone = true;
     }
     
+    number numbertilde_01_smooth_d_next(number x) {
+        number temp = (number)(x - this->numbertilde_01_smooth_d_prev);
+        this->numbertilde_01_smooth_d_prev = x;
+        return temp;
+    }
+    
+    void numbertilde_01_smooth_d_dspsetup() {
+        this->numbertilde_01_smooth_d_reset();
+    }
+    
+    void numbertilde_01_smooth_d_reset() {
+        this->numbertilde_01_smooth_d_prev = 0;
+    }
+    
+    number numbertilde_01_smooth_next(number x, number up, number down) {
+        if (this->numbertilde_01_smooth_d_next(x) != 0.) {
+            if (x > this->numbertilde_01_smooth_prev) {
+                number _up = up;
+    
+                if (_up < 1)
+                    _up = 1;
+    
+                this->numbertilde_01_smooth_index = _up;
+                this->numbertilde_01_smooth_increment = (x - this->numbertilde_01_smooth_prev) / _up;
+            } else if (x < this->numbertilde_01_smooth_prev) {
+                number _down = down;
+    
+                if (_down < 1)
+                    _down = 1;
+    
+                this->numbertilde_01_smooth_index = _down;
+                this->numbertilde_01_smooth_increment = (x - this->numbertilde_01_smooth_prev) / _down;
+            }
+        }
+    
+        if (this->numbertilde_01_smooth_index > 0) {
+            this->numbertilde_01_smooth_prev += this->numbertilde_01_smooth_increment;
+            this->numbertilde_01_smooth_index -= 1;
+        } else {
+            this->numbertilde_01_smooth_prev = x;
+        }
+    
+        return this->numbertilde_01_smooth_prev;
+    }
+    
+    void numbertilde_01_smooth_reset() {
+        this->numbertilde_01_smooth_prev = 0;
+        this->numbertilde_01_smooth_index = 0;
+        this->numbertilde_01_smooth_increment = 0;
+        this->numbertilde_01_smooth_d_reset();
+    }
+    
+    void numbertilde_01_init() {
+        this->numbertilde_01_currentMode = 1;
+        this->getEngine()->sendNumMessage(TAG("setup"), TAG("poly/number~_obj-30"), 1, this->_currentTime);
+    }
+    
+    void numbertilde_01_dspsetup(bool force) {
+        if ((bool)(this->numbertilde_01_setupDone) && (bool)(!(bool)(force)))
+            return;
+    
+        this->numbertilde_01_currentIntervalInSamples = this->mstosamps(100);
+        this->numbertilde_01_currentInterval = this->numbertilde_01_currentIntervalInSamples;
+        this->numbertilde_01_rampInSamples = this->mstosamps(this->numbertilde_01_ramp);
+        this->numbertilde_01_setupDone = true;
+        this->numbertilde_01_smooth_d_dspsetup();
+    }
+    
+    void scopetilde_01_updateEffectiveCount() {
+        number effectiveCount = 256 * 1 + 256 * 0;
+        this->scopetilde_01_effectiveCount = this->maximum(effectiveCount, 256);
+    }
+    
+    void scopetilde_01_dspsetup(bool force) {
+        if ((bool)(this->scopetilde_01_setupDone) && (bool)(!(bool)(force)))
+            return;
+    
+        {
+            this->scopetilde_01_mode = 1;
+        }
+    
+        this->getEngine()->sendListMessage(
+            TAG("setup"),
+            TAG("poly/scope~_obj-28"),
+            {1, 1, this->samplerate(), 0, 1, 0, 0, 128, this->scopetilde_01_mode},
+            this->_currentTime
+        );;
+    
+        this->scopetilde_01_updateEffectiveCount();
+        this->scopetilde_01_setupDone = true;
+    }
+    
     void param_01_getPresetValue(PatcherStateInterface& preset) {
         preset["value"] = this->param_01_value;
     }
@@ -1546,25 +2465,44 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
     void assign_defaults()
     {
+        pack_01_in1 = 1;
+        pack_01_in2 = 0;
+        pack_01_in3 = -0.5;
+        pack_01_in4 = 0;
+        pack_01_in5 = 0;
+        pack_01_in6 = 0.5;
+        expr_01_in1 = 0;
+        expr_01_in2 = 128;
+        expr_01_out1 = 0;
+        expr_02_in1 = 0;
+        expr_02_in2 = 0;
+        expr_02_out1 = 0;
+        mtof_01_base = 440;
         stripnote_01_velocity = 0;
+        notein_01_channel = 0;
+        curve_01_time = 1000;
+        curve_01_curve = 0.5;
         dspexpr_01_in1 = 0;
         dspexpr_01_in2 = -1;
         dspexpr_01_in3 = 1;
         gen_01_in1 = 0;
-        gen_01_a2 = 0;
         gen_01_feedback = 0.99;
-        gen_01_dampen = 0.25;
-        gen_01_a1 = 0;
         gen_01_note = 0;
+        gen_01_dampen = 0.25;
+        gen_01_a = 0;
+        gen_01_b = 0;
         lores_01_cutoff = 200;
         lores_01_resonance = 0.2;
         lores_01_resonance_setter(lores_01_resonance);
-        notein_01_channel = 0;
-        param_01_value = 200;
-        param_02_value = 0.03;
-        param_03_value = 0.98;
-        param_04_value = 0.01;
-        param_05_value = 0.01;
+        floatnum_01_input_number = 0;
+        floatnum_01_value = 0;
+        numbertilde_01_input_number = 0;
+        numbertilde_01_ramp = 0;
+        param_01_value = 2000;
+        param_02_value = 0.003;
+        param_03_value = 0.99;
+        param_04_value = 1;
+        param_05_value = 0;
         _currentTime = 0;
         audioProcessSampleCount = 0;
         sampleOffsetIntoNextAudioBuffer = 0;
@@ -1572,12 +2510,40 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         dummyBuffer = nullptr;
         signals[0] = nullptr;
         signals[1] = nullptr;
+        signals[2] = nullptr;
+        signals[3] = nullptr;
         didAllocateSignals = 0;
         vs = 0;
         maxvs = 0;
         sr = 44100;
         invsr = 0.00002267573696;
-        gen_01_avg_value = 0;
+        mtof_01_innerMtoF_lastInValue = 0;
+        mtof_01_innerMtoF_lastOutValue = 0;
+        mtof_01_innerMtoF_lastTuning = 0;
+        mtof_01_innerScala_internal = true;
+        mtof_01_innerScala_lastValid = false;
+        mtof_01_innerScala_lastNote = 0;
+        mtof_01_innerScala_lastFreq = 0;
+        mtof_01_innerScala_sclEntryCount = 0;
+        mtof_01_innerScala_sclOctaveMul = 1;
+        mtof_01_innerScala_kbmValid = { 0, 0, 0, 60, 69, 440 };
+        mtof_01_innerScala_kbmMid = 60;
+        mtof_01_innerScala_kbmRefNum = 69;
+        mtof_01_innerScala_kbmRefFreq = 440;
+        mtof_01_innerScala_kbmSize = 0;
+        mtof_01_innerScala_kbmMin = 0;
+        mtof_01_innerScala_kbmMax = 0;
+        mtof_01_innerScala_kbmOctaveDegree = 12;
+        mtof_01_innerScala_kbmMapSize = 0;
+        mtof_01_innerScala_refFreq = 261.63;
+        notein_01_status = 0;
+        notein_01_byte1 = -1;
+        notein_01_inchan = 0;
+        curve_01_currentValue = 0.3;
+        curve_01_samplecount = 0;
+        gen_01_history_6_value = 0;
+        gen_01_history_5_value = 0;
+        gen_01_history_4_value = 0;
         gen_01_history_3_value = 0;
         gen_01_history_2_value = 0;
         gen_01_delay_1__maxdelay = 0;
@@ -1592,11 +2558,24 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         gen_01_dcblock_4_ym1 = 0;
         gen_01_setupDone = false;
         lores_01_setupDone = false;
-        click_01_lastclick = -1;
-        click_01_buf = nullptr;
-        notein_01_status = 0;
-        notein_01_byte1 = -1;
-        notein_01_inchan = 0;
+        floatnum_01_stored = 1;
+        numbertilde_01_currentInterval = 0;
+        numbertilde_01_currentIntervalInSamples = 0;
+        numbertilde_01_lastValue = 0;
+        numbertilde_01_outValue = 0;
+        numbertilde_01_rampInSamples = 0;
+        numbertilde_01_currentMode = 0;
+        numbertilde_01_smooth_d_prev = 0;
+        numbertilde_01_smooth_prev = 0;
+        numbertilde_01_smooth_index = 0;
+        numbertilde_01_smooth_increment = 0;
+        numbertilde_01_setupDone = false;
+        scopetilde_01_lastValue = 0;
+        scopetilde_01_effectiveCount = 256;
+        scopetilde_01_xsign = 1;
+        scopetilde_01_ysign = 1;
+        scopetilde_01_mode = 0;
+        scopetilde_01_setupDone = false;
         param_01_lastValue = 0;
         param_02_lastValue = 0;
         param_03_lastValue = 0;
@@ -1611,19 +2590,42 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
     
     // member variables
     
+        number pack_01_in1;
+        number pack_01_in2;
+        number pack_01_in3;
+        number pack_01_in4;
+        number pack_01_in5;
+        number pack_01_in6;
+        number expr_01_in1;
+        number expr_01_in2;
+        number expr_01_out1;
+        number expr_02_in1;
+        number expr_02_in2;
+        number expr_02_out1;
+        list mtof_01_midivalue;
+        list mtof_01_scale;
+        list mtof_01_map;
+        number mtof_01_base;
         number stripnote_01_velocity;
+        number notein_01_channel;
+        list curve_01_dest;
+        number curve_01_time;
+        number curve_01_curve;
         number dspexpr_01_in1;
         number dspexpr_01_in2;
         number dspexpr_01_in3;
         number gen_01_in1;
-        number gen_01_a2;
         number gen_01_feedback;
-        number gen_01_dampen;
-        number gen_01_a1;
         number gen_01_note;
+        number gen_01_dampen;
+        number gen_01_a;
+        number gen_01_b;
         number lores_01_cutoff;
         number lores_01_resonance;
-        number notein_01_channel;
+        number floatnum_01_input_number;
+        number floatnum_01_value;
+        number numbertilde_01_input_number;
+        number numbertilde_01_ramp;
         number param_01_value;
         number param_02_value;
         number param_03_value;
@@ -1634,13 +2636,44 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         SampleIndex sampleOffsetIntoNextAudioBuffer;
         signal zeroBuffer;
         signal dummyBuffer;
-        SampleValue * signals[2];
+        SampleValue * signals[4];
         bool didAllocateSignals;
         Index vs;
         Index maxvs;
         number sr;
         number invsr;
-        number gen_01_avg_value;
+        number mtof_01_innerMtoF_lastInValue;
+        number mtof_01_innerMtoF_lastOutValue;
+        number mtof_01_innerMtoF_lastTuning;
+        Float64BufferRef mtof_01_innerMtoF_buffer;
+        bool mtof_01_innerScala_internal;
+        const Index mtof_01_innerScala_KBM_MAP_OFFSET = 7;
+        bool mtof_01_innerScala_lastValid;
+        number mtof_01_innerScala_lastNote;
+        number mtof_01_innerScala_lastFreq;
+        int mtof_01_innerScala_sclEntryCount;
+        number mtof_01_innerScala_sclOctaveMul;
+        list mtof_01_innerScala_sclExpMul;
+        list mtof_01_innerScala_kbmValid;
+        int mtof_01_innerScala_kbmMid;
+        int mtof_01_innerScala_kbmRefNum;
+        number mtof_01_innerScala_kbmRefFreq;
+        int mtof_01_innerScala_kbmSize;
+        int mtof_01_innerScala_kbmMin;
+        int mtof_01_innerScala_kbmMax;
+        int mtof_01_innerScala_kbmOctaveDegree;
+        Index mtof_01_innerScala_kbmMapSize;
+        number mtof_01_innerScala_refFreq;
+        int notein_01_status;
+        int notein_01_byte1;
+        int notein_01_inchan;
+        list curve_01_activeRamps;
+        number curve_01_currentValue;
+        number curve_01_samplecount;
+        number curve_01_startvalue;
+        number gen_01_history_6_value;
+        number gen_01_history_5_value;
+        number gen_01_history_4_value;
         number gen_01_history_3_value;
         number gen_01_history_2_value;
         Float64BufferRef gen_01_delay_1_buffer;
@@ -1667,11 +2700,27 @@ class RNBOSubpatcher_12 : public PatcherInterfaceImpl {
         number lores_01_last_res_calc;
         number lores_01_last_freq_calc;
         bool lores_01_setupDone;
-        SampleIndex click_01_lastclick;
-        signal click_01_buf;
-        int notein_01_status;
-        int notein_01_byte1;
-        int notein_01_inchan;
+        number floatnum_01_stored;
+        SampleIndex numbertilde_01_currentInterval;
+        SampleIndex numbertilde_01_currentIntervalInSamples;
+        number numbertilde_01_lastValue;
+        number numbertilde_01_outValue;
+        number numbertilde_01_rampInSamples;
+        Int numbertilde_01_currentMode;
+        number numbertilde_01_smooth_d_prev;
+        number numbertilde_01_smooth_prev;
+        number numbertilde_01_smooth_index;
+        number numbertilde_01_smooth_increment;
+        bool numbertilde_01_setupDone;
+        number scopetilde_01_lastValue;
+        number scopetilde_01_effectiveCount;
+        number scopetilde_01_xmonitorvalue;
+        number scopetilde_01_ymonitorvalue;
+        list scopetilde_01_monitorbuffer;
+        number scopetilde_01_xsign;
+        number scopetilde_01_ysign;
+        Int scopetilde_01_mode;
+        bool scopetilde_01_setupDone;
         number param_01_lastValue;
         number param_02_lastValue;
         number param_03_lastValue;
@@ -1914,7 +2963,7 @@ void getState(PatcherStateInterface& ) {}
 
 void setState() {
     for (Index i = 0; i < 8; i++) {
-        this->poly[(Index)i] = new RNBOSubpatcher_12();
+        this->poly[(Index)i] = new RNBOSubpatcher_126();
         this->poly[(Index)i]->setEngineAndPatcher(this->getEngine(), this);
         this->poly[(Index)i]->initialize();
         this->poly[(Index)i]->setParameterOffset(this->getParameterOffset(this->poly[0]));
@@ -1927,8 +2976,8 @@ void getPreset(PatcherStateInterface& preset) {
     this->param_06_getPresetValue(getSubState(preset, "cutOff"));
     this->param_07_getPresetValue(getSubState(preset, "dampen"));
     this->param_08_getPresetValue(getSubState(preset, "feedback"));
-    this->param_09_getPresetValue(getSubState(preset, "a1"));
-    this->param_10_getPresetValue(getSubState(preset, "a2"));
+    this->param_09_getPresetValue(getSubState(preset, "dispersion"));
+    this->param_10_getPresetValue(getSubState(preset, "tuning"));
 
     for (Index i = 0; i < 8; i++)
         this->poly[i]->getPreset(getSubStateAt(getSubState(preset, "__sps"), "poly", i));
@@ -1939,8 +2988,8 @@ void setPreset(MillisecondTime time, PatcherStateInterface& preset) {
     this->param_06_setPresetValue(getSubState(preset, "cutOff"));
     this->param_07_setPresetValue(getSubState(preset, "dampen"));
     this->param_08_setPresetValue(getSubState(preset, "feedback"));
-    this->param_09_setPresetValue(getSubState(preset, "a1"));
-    this->param_10_setPresetValue(getSubState(preset, "a2"));
+    this->param_09_setPresetValue(getSubState(preset, "dispersion"));
+    this->param_10_setPresetValue(getSubState(preset, "tuning"));
 }
 
 void processTempoEvent(MillisecondTime time, Tempo tempo) {
@@ -2096,11 +3145,11 @@ ConstCharPointer getParameterName(ParameterIndex index) const {
         }
     case 3:
         {
-        return "a1";
+        return "dispersion";
         }
     case 4:
         {
-        return "a2";
+        return "tuning";
         }
     default:
         {
@@ -2133,11 +3182,11 @@ ConstCharPointer getParameterId(ParameterIndex index) const {
         }
     case 3:
         {
-        return "a1";
+        return "dispersion";
         }
     case 4:
         {
-        return "a2";
+        return "tuning";
         }
     default:
         {
@@ -2160,9 +3209,9 @@ void getParameterInfo(ParameterIndex index, ParameterInfo * info) const {
         case 0:
             {
             info->type = ParameterTypeNumber;
-            info->initialValue = 200;
+            info->initialValue = 2000;
             info->min = 200;
-            info->max = 2200;
+            info->max = 10000;
             info->exponent = 1;
             info->steps = 0;
             info->debug = false;
@@ -2179,7 +3228,7 @@ void getParameterInfo(ParameterIndex index, ParameterInfo * info) const {
         case 1:
             {
             info->type = ParameterTypeNumber;
-            info->initialValue = 0.03;
+            info->initialValue = 0.003;
             info->min = 0;
             info->max = 1;
             info->exponent = 1;
@@ -2198,7 +3247,7 @@ void getParameterInfo(ParameterIndex index, ParameterInfo * info) const {
         case 2:
             {
             info->type = ParameterTypeNumber;
-            info->initialValue = 0.98;
+            info->initialValue = 0.99;
             info->min = 0;
             info->max = 1;
             info->exponent = 1;
@@ -2217,7 +3266,7 @@ void getParameterInfo(ParameterIndex index, ParameterInfo * info) const {
         case 3:
             {
             info->type = ParameterTypeNumber;
-            info->initialValue = 0.01;
+            info->initialValue = 1;
             info->min = -1;
             info->max = 1;
             info->exponent = 1;
@@ -2236,7 +3285,7 @@ void getParameterInfo(ParameterIndex index, ParameterInfo * info) const {
         case 4:
             {
             info->type = ParameterTypeNumber;
-            info->initialValue = 0.01;
+            info->initialValue = 0;
             info->min = -1;
             info->max = 1;
             info->exponent = 1;
@@ -2307,8 +3356,8 @@ ParameterValue convertToNormalizedParameterValue(ParameterIndex index, Parameter
     case 0:
         {
         {
-            value = (value < 200 ? 200 : (value > 2200 ? 2200 : value));
-            ParameterValue normalizedValue = (value - 200) / (2200 - 200);
+            value = (value < 200 ? 200 : (value > 10000 ? 10000 : value));
+            ParameterValue normalizedValue = (value - 200) / (10000 - 200);
             return normalizedValue;
         }
         }
@@ -2357,7 +3406,7 @@ ParameterValue convertFromNormalizedParameterValue(ParameterIndex index, Paramet
             value = (value < 0 ? 0 : (value > 1 ? 1 : value));
 
             {
-                return 200 + value * (2200 - 200);
+                return 200 + value * (10000 - 200);
             }
         }
         }
@@ -2569,7 +3618,7 @@ void param_09_value_set(number v) {
         this->param_09_lastValue = this->param_09_value;
     }
 
-    this->poly_a1_set(v);
+    this->poly_dispersion_set(v);
 }
 
 void param_10_value_set(number v) {
@@ -2582,7 +3631,7 @@ void param_10_value_set(number v) {
         this->param_10_lastValue = this->param_10_value;
     }
 
-    this->poly_a2_set(v);
+    this->poly_tuning_set(v);
 }
 
 number msToSamps(MillisecondTime ms, number sampleRate) {
@@ -2669,7 +3718,7 @@ void startup() {
 }
 
 static number param_06_value_constrain(number v) {
-    v = (v > 2200 ? 2200 : (v < 200 ? 200 : v));
+    v = (v > 10000 ? 10000 : (v < 200 ? 200 : v));
     return v;
 }
 
@@ -2712,7 +3761,7 @@ static number param_09_value_constrain(number v) {
     return v;
 }
 
-void poly_a1_set(number v) {
+void poly_dispersion_set(number v) {
     for (number i = 0; i < 8; i++) {
         if (i + 1 == this->poly_target || 0 == this->poly_target) {
             this->poly[(Index)i]->setParameterValue(3, v, this->_currentTime);
@@ -2725,7 +3774,7 @@ static number param_10_value_constrain(number v) {
     return v;
 }
 
-void poly_a2_set(number v) {
+void poly_tuning_set(number v) {
     for (number i = 0; i < 8; i++) {
         if (i + 1 == this->poly_target || 0 == this->poly_target) {
             this->poly[(Index)i]->setParameterValue(4, v, this->_currentTime);
@@ -2911,7 +3960,7 @@ void midinotecontroller_01_midiin_set(number v) {
             this->midinotecontroller_01_voice_state[(Index)i] = MIDI_NoteState_On;
             this->midinotecontroller_01_voice_lastontime[(Index)i] = this->currenttime();
             this->midinotecontroller_01_voice_notenumber[(Index)i] = this->midinotecontroller_01_byte1;
-            this->midinotecontroller_01_voice_channel[(Index)i] = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F);
+            this->midinotecontroller_01_voice_channel[(Index)i] = (BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F);
 
             for (Index j = 0; j < 128; j++) {
                 if (this->midinotecontroller_01_notesdown[(Index)j] == 0) {
@@ -2932,7 +3981,7 @@ void midinotecontroller_01_midiin_set(number v) {
             this->midinotecontroller_01_noteNumber_set(this->midinotecontroller_01_voice_notenumber[(Index)i]);
 
             this->midinotecontroller_01_midiout_set(
-                (BinOpInt)((UBinOpInt)MIDI_NoteOnMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)i])
+                (BinOpInt)((BinOpInt)MIDI_NoteOnMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)i])
             );
 
             this->midinotecontroller_01_midiout_set(this->midinotecontroller_01_voice_notenumber[(Index)i]);
@@ -2946,7 +3995,7 @@ void midinotecontroller_01_midiin_set(number v) {
         {
             number target = 0;
             number notenumber = this->midinotecontroller_01_byte1;
-            number channel = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F);
+            number channel = (BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F);
 
             for (Index i = 0; i < 8; i++) {
                 if (this->midinotecontroller_01_voice_notenumber[(Index)i] == notenumber && this->midinotecontroller_01_voice_channel[(Index)i] == channel && this->midinotecontroller_01_voice_state[(Index)i] == MIDI_NoteState_On) {
@@ -3016,7 +4065,7 @@ void midinotecontroller_01_midiin_set(number v) {
                 {
                 {
                     bool pedaldown = (bool)((val >= 64 ? true : false));
-                    number channel = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F);
+                    number channel = (BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F);
                     Index j = (Index)(channel);
                     bool ignoresustainchannel = true;
                     this->midinotecontroller_01_channel_sustain[((bool)(ignoresustainchannel) ? 0 : j)] = pedaldown;
@@ -3026,7 +4075,7 @@ void midinotecontroller_01_midiin_set(number v) {
                             if (((bool)(ignoresustainchannel) || this->midinotecontroller_01_voice_channel[(Index)i] == channel) && this->midinotecontroller_01_voice_state[(Index)i] == MIDI_NoteState_Sustained) {
                                 number currentTarget = this->midinotecontroller_01_currenttarget;
                                 this->midinotecontroller_01_target_set(i + 1);
-                                this->midinotecontroller_01_midiout_set((BinOpInt)((UBinOpInt)MIDI_NoteOffMask | (UBinOpInt)j));
+                                this->midinotecontroller_01_midiout_set((BinOpInt)((BinOpInt)MIDI_NoteOffMask | (BinOpInt)j));
                                 this->midinotecontroller_01_midiout_set(this->midinotecontroller_01_voice_notenumber[(Index)i]);
                                 this->midinotecontroller_01_midiout_set(64);
                                 this->midinotecontroller_01_target_set(currentTarget);
@@ -3041,10 +4090,10 @@ void midinotecontroller_01_midiin_set(number v) {
             case MIDI_CC_TimbreMSB:
                 {
                 {
-                    number channel = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F);
+                    number channel = (BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F);
                     int k = (int)(v);
-                    number timbre = (BinOpInt)(((UBinOpInt)((UBinOpInt)k & (UBinOpInt)0x7F)) << (UBinOpInt)7);
-                    this->midinotecontroller_01_channel_timbre[(Index)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F)] = timbre;
+                    number timbre = (BinOpInt)(((BinOpInt)((BinOpInt)k & (BinOpInt)0x7F)) << imod_nocast((UBinOpInt)7, 32));
+                    this->midinotecontroller_01_channel_timbre[(Index)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F)] = timbre;
 
                     for (Index i = 0; i < 8; i++) {
                         if (this->midinotecontroller_01_voice_channel[(Index)i] == channel && this->midinotecontroller_01_voice_state[(Index)i] != MIDI_NoteState_Off) {
@@ -3097,7 +4146,7 @@ void midinotecontroller_01_midiin_set(number v) {
     case MIDI_ChannelPressure:
         {
         {
-            number channel = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F);
+            number channel = (BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F);
 
             for (number i = 0; i < 8; i++) {
                 if (this->midinotecontroller_01_voice_state[(Index)i] != MIDI_NoteState_Off && this->midinotecontroller_01_voice_channel[(Index)i] == channel) {
@@ -3113,8 +4162,8 @@ void midinotecontroller_01_midiin_set(number v) {
     case MIDI_PitchBend:
         {
         {
-            number bendamount = (BinOpInt)((UBinOpInt)this->midinotecontroller_01_byte1 | (UBinOpInt)((UBinOpInt)val << (UBinOpInt)7));
-            int channel = (int)((BinOpInt)((UBinOpInt)this->midinotecontroller_01_status & (UBinOpInt)0x0F));
+            number bendamount = (BinOpInt)((BinOpInt)this->midinotecontroller_01_byte1 | (BinOpInt)((BinOpInt)val << imod_nocast((UBinOpInt)7, 32)));
+            int channel = (int)((BinOpInt)((BinOpInt)this->midinotecontroller_01_status & (BinOpInt)0x0F));
             this->midinotecontroller_01_channel_pitchbend[(Index)channel] = bendamount;
 
             for (Index i = 0; i < 8; i++) {
@@ -3252,7 +4301,7 @@ void midinotecontroller_01_sendnoteoff(int target) {
         this->midinotecontroller_01_target_set(target);
 
         this->midinotecontroller_01_midiout_set(
-            (BinOpInt)((UBinOpInt)MIDI_NoteOffMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)i])
+            (BinOpInt)((BinOpInt)MIDI_NoteOffMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)i])
         );
 
         this->midinotecontroller_01_midiout_set(this->midinotecontroller_01_voice_notenumber[(Index)i]);
@@ -3269,13 +4318,13 @@ void midinotecontroller_01_sendpitchbend(int v) {
         int totalbendamount = (int)(this->midinotecontroller_01_channel_pitchbend[(Index)this->midinotecontroller_01_voice_channel[(Index)v]]);
 
         this->midinotecontroller_01_midiout_set(
-            (BinOpInt)((UBinOpInt)MIDI_PitchBendMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
+            (BinOpInt)((BinOpInt)MIDI_PitchBendMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
         );
 
-        this->midinotecontroller_01_midiout_set((BinOpInt)((UBinOpInt)totalbendamount & (UBinOpInt)0x7F));
+        this->midinotecontroller_01_midiout_set((BinOpInt)((BinOpInt)totalbendamount & (BinOpInt)0x7F));
 
         this->midinotecontroller_01_midiout_set(
-            (BinOpInt)((UBinOpInt)((UBinOpInt)totalbendamount >> (UBinOpInt)7) & (UBinOpInt)0x7F)
+            (BinOpInt)((BinOpInt)((BinOpInt)totalbendamount >> imod_nocast((UBinOpInt)imod_nocast((UBinOpInt)7, 32), 32)) & (BinOpInt)0x7F)
         );
 
         this->midinotecontroller_01_target_set(currentTarget);
@@ -3287,7 +4336,7 @@ void midinotecontroller_01_sendpressure(int v) {
     this->midinotecontroller_01_target_set(v + 1);
 
     this->midinotecontroller_01_midiout_set(
-        (BinOpInt)((UBinOpInt)MIDI_ChannelPressureMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
+        (BinOpInt)((BinOpInt)MIDI_ChannelPressureMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
     );
 
     this->midinotecontroller_01_midiout_set(
@@ -3302,23 +4351,23 @@ void midinotecontroller_01_sendtimbre(int v) {
     this->midinotecontroller_01_target_set(v + 1);
 
     this->midinotecontroller_01_midiout_set(
-        (BinOpInt)((UBinOpInt)MIDI_CCMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
+        (BinOpInt)((BinOpInt)MIDI_CCMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
     );
 
     this->midinotecontroller_01_midiout_set(MIDI_CC_TimbreLSB);
 
     this->midinotecontroller_01_midiout_set(
-        (BinOpInt)((UBinOpInt)this->midinotecontroller_01_channel_timbre[(Index)this->midinotecontroller_01_voice_channel[(Index)v]] & (UBinOpInt)0x7F)
+        (BinOpInt)((BinOpInt)this->midinotecontroller_01_channel_timbre[(Index)this->midinotecontroller_01_voice_channel[(Index)v]] & (BinOpInt)0x7F)
     );
 
     this->midinotecontroller_01_midiout_set(
-        (BinOpInt)((UBinOpInt)MIDI_CCMask | (UBinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
+        (BinOpInt)((BinOpInt)MIDI_CCMask | (BinOpInt)this->midinotecontroller_01_voice_channel[(Index)v])
     );
 
     this->midinotecontroller_01_midiout_set(MIDI_CC_TimbreMSB);
 
     this->midinotecontroller_01_midiout_set(
-        (BinOpInt)((UBinOpInt)((UBinOpInt)this->midinotecontroller_01_channel_timbre[(Index)this->midinotecontroller_01_voice_channel[(Index)v]] >> (UBinOpInt)7) & (UBinOpInt)0x7F)
+        (BinOpInt)((BinOpInt)((BinOpInt)this->midinotecontroller_01_channel_timbre[(Index)this->midinotecontroller_01_voice_channel[(Index)v]] >> imod_nocast((UBinOpInt)7, 32)) & (BinOpInt)0x7F)
     );
 
     this->midinotecontroller_01_target_set(currentTarget);
@@ -3557,11 +4606,11 @@ void updateTime(MillisecondTime time) {
 void assign_defaults()
 {
     midiin_port = 0;
-    param_06_value = 200;
-    param_07_value = 0.03;
-    param_08_value = 0.98;
-    param_09_value = 0.01;
-    param_10_value = 0.01;
+    param_06_value = 2000;
+    param_07_value = 0.003;
+    param_08_value = 0.99;
+    param_09_value = 1;
+    param_10_value = 0;
     poly_target = 0;
     poly_midiin = 0;
     midinotecontroller_01_currenttarget = 0;
@@ -3673,7 +4722,7 @@ void assign_defaults()
     Index isMuted;
     indexlist paramInitIndices;
     indexlist paramInitOrder;
-    RNBOSubpatcher_12* poly[8];
+    RNBOSubpatcher_126* poly[8];
 
 };
 

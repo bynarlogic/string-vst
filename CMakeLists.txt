@@ -14,7 +14,7 @@ set(CMAKE_COLOR_DIAGNOSTICS ON)
 
 set(RNBO_CPP_DIR "${CMAKE_CURRENT_SOURCE_DIR}/export/rnbo/" CACHE FILEPATH "The path to the the RNBO c++ source directory")
 set(RNBO_EXPORT_DIR "${CMAKE_CURRENT_SOURCE_DIR}/export/" CACHE FILEPATH "path to your export directory")
-set(RNBO_CLASS_FILE_NAME "rnbo_source.cpp" CACHE STRING "the name of your rnbo class file")
+set(RNBO_CLASS_FILE_NAME "waveguide-string.cpp" CACHE STRING "the name of your rnbo class file")
 mark_as_advanced(RNBO_CLASS_FILE_NAME)
 
 set(RNBO_CLASS_NAME "rnbomatic")

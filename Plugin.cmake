@@ -20,10 +20,10 @@ juce_add_plugin(RNBOAudioPlugin
   # VERSION ...                        # Set this if the plugin version is different to the project version
   # ICON_BIG ...                       # ICON_* arguments specify a path to an image file to use as an icon for the Standalone
   # ICON_SMALL ...
-  COMPANY_NAME "Refactored Noise"     # Specify the name of the plugin's author
+  COMPANY_NAME "Packard Audio"     # Specify the name of the plugin's author
   IS_SYNTH TRUE                        # Is this a synth or an effect?
   NEEDS_MIDI_INPUT TRUE                # Does the plugin need midi input?
-  NEEDS_MIDI_OUTPUT TRUE               # Does the plugin need midi output?
+  NEEDS_MIDI_OUTPUT FALSE               # Does the plugin need midi output?
   IS_MIDI_EFFECT FALSE                 # Is this plugin a MIDI effect?
   EDITOR_WANTS_KEYBOARD_FOCUS FALSE    # Does the editor need keyboard focus?
   COPY_PLUGIN_AFTER_BUILD FALSE        # Should the plugin be installed to a default location after building?
